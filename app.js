@@ -274,8 +274,9 @@ btnAnalizar.onclick = () => {      // 👉 Inicia el análisis completo de la tr
   // 👉 Se obtiene la traza pegada por el usuario
 const texto = document.getElementById("inputTraza").value.trim();
 
+  // 👉 Guardamos la traza original para mostrar literales tal cual se pegaron
+const lineasOriginales = texto.split(/\r?\n/);
 
-  
   // 👉 Se convierte todo a mayúsculas. Evita errores al buscar textos (TR_, literales, etc.)
 const traza = texto.toUpperCase();
 
@@ -298,7 +299,7 @@ if (!traza.includes("TR_")) {
 
 // 👉 Paso 0: dividimos la traza en líneas (ANTES de usarla)
 // 🔹 necesario para fase 9 (orden real)
-const lineas = traza.split("\n");
+const lineas = traza.split(/\r?\n/);
 
 // 👉 Extraemos eventos TR_ en ORDEN REAL
 // 🔹 esto nos permite saber cuál es el último evento válido
@@ -411,41 +412,52 @@ console.log("CONTEXTO:", contexto);
 // 👉 Paso 1: filtramos solo líneas que contienen errores reales
 // 🔹 ampliamos detección para cubrir casos de sesión, firma y técnicos
 
-const lineasError = lineas.filter(linea => {
+const lineasErrorEntries = lineas
+  .map((linea, indice) => ({ linea, original: lineasOriginales[indice] || linea }))
+  .filter(entry => {
 
   // 👉 errores técnicos existentes (igual que antes)
   const esErrorTecnico =
-linea.includes("FLUXE") ||
-linea.includes("SESSIÓ") ||
-linea.includes("SESSION") ||
-linea.includes("EXCEPCIÓ") ||
-linea.includes("EXCEPTION") ||
-linea.includes("SAF_") ||
-linea.includes("ERROR") ||
+entry.linea.includes("FLUXE") ||
+entry.linea.includes("SESSIÓ") ||
+entry.linea.includes("SESSION") ||
+entry.linea.includes("EXCEPCIÓ") ||
+entry.linea.includes("EXCEPTION") ||
+entry.linea.includes("SAF_") ||
+entry.linea.includes("ERROR") ||
 (
-  linea.includes("CLAVEFIRMA") ||
-  linea.includes("CODI ERROR") ||
-  linea.includes("PROVEÏDOR: CLAVEFIRMA")
+  entry.linea.includes("CLAVEFIRMA") ||
+  entry.linea.includes("CODI ERROR") ||
+  entry.linea.includes("PROVEÏDOR: CLAVEFIRMA")
 );
 
 
   // 🔥 NUEVO: detectar posibles errores de formulario sin "ERROR"
   const esPosibleErrorFormulario =
-    !linea.includes("TR_") &&            // no es evento
-    !linea.includes("HTTP") &&          // evitar ruido técnico
-    !linea.includes("HTTPS") &&
-    linea.length > 20 &&                // evitar basura corta
-    /[A-ZÀ-Ú]{3,}/.test(linea);         // contiene texto real
+    !entry.linea.includes("TR_") &&            // no es evento
+    !entry.linea.includes("HTTP") &&          // evitar ruido técnico
+    !entry.linea.includes("HTTPS") &&
+    entry.linea.length > 20 &&                // evitar basura corta
+    /[A-ZÀ-Ú]{3,}/.test(entry.linea);         // contiene texto real
 
   // 👉 devolver cualquiera de los dos
   return esErrorTecnico || esPosibleErrorFormulario;
 
 });
 
-  
+const lineasError = lineasErrorEntries.map(entry => entry.linea);
+
 // 👉 Paso 2: eliminamos duplicados
 // 🔹 nos quedamos solo con errores únicos
 const erroresUnicos = [...new Set(lineasError)];
+const erroresUnicosOriginales = [];
+const seenLineas = new Set();
+lineasErrorEntries.forEach(entry => {
+  if (!seenLineas.has(entry.linea)) {
+    seenLineas.add(entry.linea);
+    erroresUnicosOriginales.push(entry.original);
+  }
+});
 
 
                                         
@@ -863,12 +875,44 @@ if (erroresUnicos.length > 0) {
   // 🔥 PRIMERO: si hay error de flujo (Portafib)
   if (hayErrorPortafibReal) {
 
-    salidaFinal += "\n\nErrores de sesión / flujo:\n";
-    salidaFinal += "Se detecta error técnico de Portafib previo a la firma.\n";
+    salidaFinal += "<div class='literales'><b>* Literales técnicos detectados:</b></div><br>";
+    salidaFinal += "<div class='literal-pequeno'>";
 
-    erroresUnicos.forEach(err => {
-      salidaFinal += err + "\n";
+    const literalCounts = {};
+    const literalOrder = [];
+    const literalOriginal = {};
+
+    const normalizarAgrupacion = (linea) => {
+      let key = linea.replace(/^ERROR\s*-\s*/i, "");
+      const partes = key.split(/\t+/).map(p => p.trim()).filter(Boolean);
+      if (partes.length > 10) {
+        key = partes.slice(10).join(" ");
+      }
+      key = key.replace(/\s+/g, ' ').trim();
+      return key;
+    };
+
+    lineasErrorEntries.forEach(entry => {
+      const clave = normalizarAgrupacion(entry.linea);
+      if (!clave) return;
+      if (clave.includes("TR_")) return;
+      if (!literalCounts[clave]) {
+        literalCounts[clave] = 0;
+        literalOrder.push(clave);
+        literalOriginal[clave] = entry.original;
+      }
+      literalCounts[clave]++;
     });
+
+    literalOrder.forEach((clave, index) => {
+      const cnt = literalCounts[clave] || 0;
+      const pref = cnt > 1 ? ('(' + cnt + 'x) ') : '';
+      const textoLiteral = literalOriginal[clave] || clave;
+      salidaFinal += pref + escapeHtml(textoLiteral) + '<br>';
+      if (index < literalOrder.length - 1) salidaFinal += '<br>';
+    });
+
+    salidaFinal += '</div>';
 
   }
 
@@ -945,6 +989,16 @@ if (flujoCard) {
   flujoCard.style.display = "inline-block";
 }
 document.getElementById("flujoVisual").style.display = "flex";
+
+// Función auxiliar para escapar texto antes de mostrarlo como HTML
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // 🔹 Convertir automáticamente cualquier URL en enlace HTML clicable
 // 🔹 Evitar reemplazar URLs que ya están dentro de un atributo href de un enlace
