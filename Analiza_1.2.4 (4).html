@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<script>
+  // 🔹 VERSION HTML (editable manual)
+  const VERSION_HTML = "1.2.4";
+</script>
+
+<!-- =====================================================
+     FUNCIONALIDADES HTML
+     =====================================================
+
+     VERSION 1.2.1
+     - Layout completo de la aplicación:
+         header + sidebar + zona principal
+     - Panel de cabecera con:
+         versión HTML / JSON / JS
+         botón actualizar (control de caché)
+         acceso a tabla de reglas
+     - Panel emergente reutilizable (mensajes dinámicos)
+     - Entrada de traza (textarea optimizado para texto técnico)
+     - Selector de método (Cl@ve / Certificado)
+     - Selector dinámico de sistema (PC / móvil)
+         visible solo para certificado
+     - Bloque de acciones:
+         botón Analizar
+         botón Limpiar
+     - Panel de resultado dinámico conectado al motor JS
+     - Placeholder inicial (estado sin análisis)
+     - Integración completa con app.js (eventos y lógica)
+
+     VERSION 1.2.0
+     - Mejora estructural del layout:
+         separación visual clara (sidebar + main)
+     - Introducción del panel de resultado independiente
+     - Mejora de accesibilidad y legibilidad del formulario
+
+     VERSION 1.1
+     - Introducción de tarjetas (cards) para organización UI
+     - Creación del panel emergente reutilizable
+     - Primer diseño funcional del flujo de usuario
+
+     VERSION 1.0
+     - Estructura base HTML de la aplicación
+     - Entrada de traza y botón de análisis
+-->
+
+<style>
+  .literales {
+    font-size: 11px;
+    color: #666;
+  }
+
+  /* 🔹 NUEVO: flujo textual */
+  .flujo-texto {
+    font-size: 11px;
+    color: #666;
+  }
+
+  /* Texto de literal ligeramente más pequeño */
+  .literal-pequeno {
+    font-size: 12px;
+    color: #444;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+</style>
+  
+<meta charset="UTF-8">
+<title>Analizador V1.2.4</title>
+
+<style>
+body {
+  font-family: system-ui;
+  background: #f5f4f0;
+  margin: 0;
+  color:#1e1c17;
+}
+
+/* HEADER */
+.header {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: white;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.header-left { display:flex; gap:14px; align-items:center;}
+
+.badge {
+  background:#01696f;
+  color:white;
+  font-size:10px;
+  padding:2px 8px;
+  border-radius:999px;
+}
+
+.ver-detalles {
+  font-size:11px;
+  color:#01696f;
+  cursor:pointer;
+}
+
+.btn-mini {
+  border:1px solid rgba(0,0,0,0.12);
+  background:#fafafa;
+  border-radius:999px;
+  padding:6px 12px;
+  cursor:pointer;
+}
+
+.header-right {
+  margin-left:auto;
+  font-size:12px;
+  color:#6b6960;
+}
+
+/* LAYOUT */
+.container { display:flex; }
+
+.sidebar {
+  width:320px;
+  padding:16px;
+  background:#faf9f7;
+  border-right:1px solid rgba(0,0,0,0.08);
+}
+
+.main { flex:1; padding:18px; }
+
+/* CARD */
+.card {
+  background:white;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:14px;
+}
+
+/* Cambios 2026-06-12: flujo visual compacto con marco blanco oculto hasta analizar */
+#flujoVisualCard {
+  display:none;
+  /* Outline-only card: transparent background so it matches the results panel */
+  background: transparent;
+  /* More visible contour */
+  border:1px solid rgba(0,0,0,0.14);
+  border-radius:12px;
+  padding:6px 10px;
+  margin:0 auto 14px;
+  box-sizing:border-box;
+  max-width: calc(100% - 32px);
+  /* Subtle shadow to lift the outline slightly from the background */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+#flujoVisual {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+}
+
+/* Ensure label space below every step so vertical alignment is consistent */
+.flujo-paso__label {
+  min-height:20px; /* reserve vertical space even if label is empty */
+  font-size:9px;
+  color:#666;
+  line-height:1.2;
+  text-align:center;
+}
+
+.check {
+  display:flex;
+  gap:10px;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:8px;
+  padding:8px;
+  margin-bottom:6px;
+}
+
+textarea {
+  width:100%;
+  height:100px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,0.1);
+  padding:10px;
+  font-family: monospace;
+  box-sizing: border-box;
+}
+
+textarea:focus {
+  outline:none;
+  border-color:#01696f;
+}
+
+/* BOTONES */
+.actions {
+  display:flex;
+  gap:10px;
+}
+
+#btnAnalizar {
+  background:#01696f;
+  color:white;
+  border:none;
+  border-radius:8px;
+  padding:10px;
+  flex:1;
+}
+
+#btnLimpiar {
+  background:#eee;
+  border:none;
+  border-radius:8px;
+  padding:10px;
+  flex:1;
+}
+
+/* PANEL */
+.panel {
+  border-radius:12px;
+  border:1px solid rgba(150,66,25,.2);
+  background:#fdf0e8;
+  margin-bottom:12px;
+}
+
+.panel-header {
+  padding:10px 14px;
+  display:flex;
+  justify-content:space-between;
+  font-weight:600;
+  color:#964219;
+}
+
+.panel-body {
+  padding:12px 14px;
+  font-size:13px;
+}
+
+.btn-close {
+  border:1px solid rgba(0,0,0,0.1);
+  background:white;
+  border-radius:6px;
+  padding:2px 8px;
+  cursor:pointer;
+}
+
+.hidden { display:none; }
+
+#placeholder {
+  text-align:center;
+  color:#999;
+  margin-top:120px;
+}
+
+#resultado {
+  white-space: pre-line;
+}
+
+#resultado .literales {
+  font-size: 11px;
+  color: #666;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+  <div class="header-left">
+    <b>Analizador de Trazas</b>
+
+    <div>
+      <div class="badge">v 1.2.4</div>
+      <div class="ver-detalles" id="btnDetalles">Ver detalles ▾</div>
+    </div>
+
+    <button class="btn-mini" id="btnActualizar">Actualizar</button>
+  </div>
+
+  <div class="header-right">
+   Lectura:
+<span id="versionHTML"></span>
+-
+<span id="versionJSON"></span>
+-
+<span id="versionJS"></span>
+    <a href="#" id="btnTabla">Reglas</a>
+  </div>
+
+</div>
+
+<div class="container">
+
+  <div class="sidebar">
+
+    <!-- ✅ SIN CAMBIOS -->
+    <div class="card">
+      <b>Problemas de acceso</b><br><br>
+
+      <label class="check">
+        <input type="radio" name="problema" id="checkSaml"> Error SAML
+      </label>
+
+      <label class="check">
+        <input type="radio" name="problema" id="checkBlanco"> Página en blanco
+      </label>
+
+    </div>
+
+    <!-- ✅ TRAZA -->
+    <div class="card">
+      <b>Traza</b><br><br>
+      <textarea id="inputTraza" placeholder="Pega la traza aquí..."></textarea>
+    </div>
+
+    <!-- ✅ MÉTODO (SIN CAMBIOS) -->
+    <div class="card">
+
+      <b>Método</b><br><br>
+
+      <label class="check">
+        <input type="radio" name="metodo" id="metodoClave"> Cl@ve
+      </label>
+
+      <label class="check">
+        <input type="radio" name="metodo" id="metodoCert"> Certificado local
+      </label>
+
+      <div id="bloqueSistema" style="display:none; margin-top:10px;">
+        <b>Sistema</b><br><br>
+
+        <label class="check">
+          <input type="radio" name="sistema" id="sisPC">
+          <div>
+            Ordenador<br>
+            <span style="font-size:11px;color:#777;">Windows / Mac / Linux</span>
+          </div>
+        </label>
+
+        <label class="check">
+          <input type="radio" name="sistema" id="sisMovil">
+          <div>
+            Dispositivo móvil<br>
+            <span style="font-size:11px;color:#777;">Android / iPhone / iPad</span>
+          </div>
+        </label>
+      </div>
+
+    </div>
+
+    <div class="actions">
+      <button id="btnAnalizar">Analizar</button>
+      <button id="btnLimpiar">Limpiar</button>
+    </div>
+
+  </div>
+
+  <div class="main">
+
+    <!-- ✅ PANEL ORIGINAL (NO TOCADO) -->
+    <div id="panel" class="panel hidden">
+      <div class="panel-header">
+        <span id="panelTitulo"></span>
+        <button class="btn-close" id="btnCerrarPanel">Cerrar ✕</button>
+      </div>
+      <div class="panel-body" id="panelContenido"></div>
+    </div>
+
+    <!-- ✅ PLACEHOLDER ORIGINAL -->
+    <div id="placeholder">
+      Pega una traza y pulsa Analizar
+    </div>
+
+    <!-- ✅ RESULTADO (solo esto sustituye CAI y demás) -->
+
+<!-- 🔹 NUEVO: flujo visual -->
+<!-- Cambio 2026-06-12: el contenedor solo se muestra tras pulsar Analizar -->
+<div id="flujoVisualCard">
+  <div id="flujoVisual"></div>
+</div>
+
+<div id="resultado" style="white-space: normal;"></div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
